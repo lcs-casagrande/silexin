@@ -6,7 +6,7 @@ Plataforma corporativa de gestão de projetos em desenvolvimento com GitHub Spec
 
 [**URL da demonstração no GitHub Pages**](https://lcs-casagrande.github.io/silexin/)
 
-Build já enviado à branch `gh-pages`; a ativação do site requer selecionar essa branch em [Settings → Pages](https://github.com/lcs-casagrande/silexin/settings/pages), pasta `/ (root)`. A integração recusou a configuração automática. Consulte o estado em [publicação da demonstração](docs/github-pages-demo.md).
+Publicado e verificado: Pages com build concluído, HTTP 200 e assets iguais ao build testado. Consulte o registro em [publicação da demonstração](docs/github-pages-demo.md).
 
 A demonstração é um frontend React/TypeScript estático com dados fictícios. Permite explorar projetos, tarefas/subtarefas, Kanban, progresso por folhas e histórico local. Não existe autenticação real, backend ou banco nessa versão; não insira dados da empresa ou credenciais. Dados alterados ficam apenas no navegador e podem ser restaurados.
 

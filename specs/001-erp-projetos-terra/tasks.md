@@ -15,7 +15,7 @@
 - [x] T003 Criar dados fictícios e estado local separado da API futura em `frontend/src/demo/data.ts`; progresso por folhas, estado vazio e sem credenciais.
 - [x] T004 Criar interface demonstrativa com dashboard, projetos, tarefas/subtarefas, Kanban, pessoas/departamentos e histórico em `frontend/src/App.tsx` e `frontend/src/styles.css`; personas são simulação, sem login real.
 - [x] T005 Validar fluxos demonstrativos e tela de 360px em `frontend/tests/demo.spec.ts`, build/typecheck e dependências; registrar resultados em `docs/github-pages-demo.md`.
-- [ ] T006 Publicar somente build estático em branch `gh-pages`, configurar Pages e verificar URL/versão de release; documentar em `docs/github-pages-demo.md`.
+- [x] T006 Publicar somente build estático em branch `gh-pages`, configurar Pages e verificar URL/versão de release; documentar em `docs/github-pages-demo.md`.
 
 **Checkpoint**: link público da demonstração, com distinção visível do ERP transacional; backend e banco não são necessários para este milestone.
 

@@ -28,6 +28,8 @@ Verificado nesta execução: build TypeScript/Vite concluído; **6 testes Playwr
 
 Build estático publicado na branch `gh-pages`, commit `b41970d`, com `release.json` apontando para o commit de origem `0e05583`. O repositório é público e a branch principal permanece sem merge.
 
-**Pendência externa**: o GitHub recusou `POST /repos/lcs-casagrande/silexin/pages` com HTTP 403, “Resource not accessible by integration”. A credencial desta sessão permite push mas não criação do site Pages; o envio do build não habilita o site automaticamente.
+A tentativa inicial de configurar o site pela integração retornou HTTP 403, “Resource not accessible by integration”. Posteriormente a consulta oficial confirmou que o Pages está **ativo**, com fonte `gh-pages` / `/` e build **built**, sem mensagem de erro.
 
-Para concluir, o administrador precisa abrir [Settings → Pages](https://github.com/lcs-casagrande/silexin/settings/pages), escolher **Deploy from a branch**, branch **gh-pages**, pasta **/ (root)** e salvar. Depois aguardar o build do GitHub. URL alvo: https://lcs-casagrande.github.io/silexin/. Até a ativação e a verificação, não afirmar que o site está acessível.
+**Acesso publicado e verificado**: https://lcs-casagrande.github.io/silexin/. A página e o release.json retornaram HTTP 200; release corresponde ao commit `0e05583`. Os arquivos JavaScript e CSS públicos são byte a byte iguais ao build local testado. O build de produção também foi exercitado em navegador local, incluindo navegação e cálculo 75%, sem erros de página. Não é necessário outro ajuste manual de Pages para essa release.
+
+A branch principal não foi alterada. O backend FastAPI/PostgreSQL continua no backlog, não publicado no Pages.
