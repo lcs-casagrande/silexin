@@ -26,4 +26,8 @@ Para atualizar, faça novo build da fonte revisada, publique os assets e nova id
 
 Verificado nesta execução: build TypeScript/Vite concluído; **6 testes Playwright passaram**, cobrindo os fluxos acima e 360px; npm audit reportou **zero vulnerabilidades**, inclusive dependências de desenvolvimento. Revisão visual do dashboard concluída. Nenhum teste de backend foi executado, porque ele não está implementado.
 
-Publicação e resposta pública serão registradas após a ativação do Pages; o link acima ainda não é, por si só, evidência de publicação.
+Build estático publicado na branch `gh-pages`, commit `b41970d`, com `release.json` apontando para o commit de origem `0e05583`. O repositório é público e a branch principal permanece sem merge.
+
+**Pendência externa**: o GitHub recusou `POST /repos/lcs-casagrande/silexin/pages` com HTTP 403, “Resource not accessible by integration”. A credencial desta sessão permite push mas não criação do site Pages; o envio do build não habilita o site automaticamente.
+
+Para concluir, o administrador precisa abrir [Settings → Pages](https://github.com/lcs-casagrande/silexin/settings/pages), escolher **Deploy from a branch**, branch **gh-pages**, pasta **/ (root)** e salvar. Depois aguardar o build do GitHub. URL alvo: https://lcs-casagrande.github.io/silexin/. Até a ativação e a verificação, não afirmar que o site está acessível.
