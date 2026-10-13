@@ -11,3 +11,5 @@ playwright-report/
 test-results/
 playwright/.auth/
 .DS_Store
+
+*.tsbuildinfo

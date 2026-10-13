@@ -1,123 +1,1775 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { ArrowDown, ArrowRight, Check, CheckCircle2, ChevronRight, Circle, Clock3, FolderKanban, History, LayoutDashboard, Leaf, ListTodo, Menu, Plus, Search, Settings2, Users, X, RotateCcw, CalendarDays, AlertCircle, SlidersHorizontal } from 'lucide-react'
-import { loadState, initialState, STORAGE_KEY, roles, statuses, priorities, projectStatuses, progress, overdue, formatDate, today, dateOffset, type Role, type State, type Task, type Project, type Status, type Priority } from './demo/data'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  Clock3,
+  FolderKanban,
+  History,
+  LayoutDashboard,
+  Leaf,
+  ListTodo,
+  Menu,
+  Plus,
+  Search,
+  Settings2,
+  Users,
+  X,
+  RotateCcw,
+  CalendarDays,
+  AlertCircle,
+  SlidersHorizontal,
+} from "lucide-react";
+import {
+  loadState,
+  initialState,
+  STORAGE_KEY,
+  roles,
+  statuses,
+  priorities,
+  projectStatuses,
+  progress,
+  overdue,
+  formatDate,
+  dateOffset,
+  type Role,
+  type State,
+  type Task,
+  type Project,
+  type Status,
+  type Priority,
+} from "./demo/data";
 
-type Page = 'dashboard' | 'projects' | 'tasks' | 'kanban' | 'people' | 'history'
-type Modal = { kind: 'project' | 'task' | 'person' | 'department'; projectId?: string; editId?: string }
-const pages: { id: Page; name: string; icon: typeof Leaf }[] = [{ id: 'dashboard', name: 'Visão geral', icon: LayoutDashboard }, { id: 'projects', name: 'Projetos', icon: FolderKanban }, { id: 'tasks', name: 'Tarefas', icon: ListTodo }, { id: 'kanban', name: 'Kanban', icon: SlidersHorizontal }, { id: 'people', name: 'Pessoas e departamentos', icon: Users }, { id: 'history', name: 'Histórico', icon: History }]
-const initials = (s: string) => s.split(' ').slice(0, 2).map(x => x[0]).join('')
-const parseRoute = () => { const [name, id] = window.location.hash.slice(1).split('/'); return { page: (pages.some(p => p.id === name) ? name : 'dashboard') as Page, id: id || '' } }
-function Badge({ children, color = '' }: { children: ReactNode; color?: string }) { return <span className={`badge ${color}`}>{children}</span> }
-function Empty({ title, detail }: { title: string; detail: string }) { return <div className="empty"><FolderKanban size={30}/><h3>{title}</h3><p>{detail}</p></div> }
-function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { const ref = useRef<HTMLDialogElement>(null); useEffect(() => { ref.current?.showModal() }, []); return <dialog ref={ref} onCancel={onClose} aria-labelledby="dialog-title"><div className="dialog-head"><h2 id="dialog-title">{title}</h2><button className="icon-button" aria-label="Fechar" onClick={onClose}><X size={20}/></button></div>{children}</dialog> }
+type Page =
+  "dashboard" | "projects" | "tasks" | "kanban" | "people" | "history";
+type Modal = {
+  kind: "project" | "task" | "person" | "department";
+  projectId?: string;
+  editId?: string;
+};
+const pages: { id: Page; name: string; icon: typeof Leaf }[] = [
+  { id: "dashboard", name: "Visão geral", icon: LayoutDashboard },
+  { id: "projects", name: "Projetos", icon: FolderKanban },
+  { id: "tasks", name: "Tarefas", icon: ListTodo },
+  { id: "kanban", name: "Kanban", icon: SlidersHorizontal },
+  { id: "people", name: "Pessoas e departamentos", icon: Users },
+  { id: "history", name: "Histórico", icon: History },
+];
+const initials = (s: string) =>
+  s
+    .split(" ")
+    .slice(0, 2)
+    .map((x) => x[0])
+    .join("");
+const parseRoute = () => {
+  const [name, id] = window.location.hash.slice(1).split("/");
+  return {
+    page: (pages.some((p) => p.id === name) ? name : "dashboard") as Page,
+    id: id || "",
+  };
+};
+function Badge({
+  children,
+  color = "",
+}: {
+  children: ReactNode;
+  color?: string;
+}) {
+  return <span className={`badge ${color}`}>{children}</span>;
+}
+function Empty({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="empty">
+      <FolderKanban size={30} />
+      <h3>{title}</h3>
+      <p>{detail}</p>
+    </div>
+  );
+}
+function Dialog({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+  }, []);
+  return (
+    <dialog ref={ref} onCancel={onClose} aria-labelledby="dialog-title">
+      <div className="dialog-head">
+        <h2 id="dialog-title">{title}</h2>
+        <button className="icon-button" aria-label="Fechar" onClick={onClose}>
+          <X size={20} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
 
 export default function App() {
-  const [state, setState] = useState<State>(loadState)
-  const [role, setRole] = useState<Role>('project_manager')
-  const [route, setRoute] = useState(parseRoute)
-  const [menu, setMenu] = useState(false)
-  const [query, setQuery] = useState('')
-  const [department, setDepartment] = useState('')
-  const [projectFilter, setProjectFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('')
-  const [overdueOnly, setOverdueOnly] = useState(false)
-  const [modal, setModal] = useState<Modal | null>(null)
-  const [toast, setToast] = useState('')
-  const [formError, setFormError] = useState('')
-  const [formProject, setFormProject] = useState('')
-  const [drag, setDrag] = useState<string | null>(null)
-  useEffect(() => { const update = () => { setRoute(parseRoute()); setMenu(false); setQuery(''); setStatusFilter(''); setDepartment(''); setProjectFilter(''); setPriorityFilter(''); setOverdueOnly(false) }; window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update) }, [])
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { setToast('As alterações funcionam nesta sessão, mas o navegador não permitiu salvar a demonstração.') } }, [state])
-  useEffect(() => { if (toast) { const timer = window.setTimeout(() => setToast(''), 6000); return () => window.clearTimeout(timer) } }, [toast])
-  const viewer = state.people.find(p => p.role === role && p.active) || state.people[0]
-  const person = (id: string) => state.people.find(p => p.id === id)?.name || 'Pessoa não encontrada'
-  const dept = (id: string) => state.departments.find(d => d.id === id)?.name || 'Departamento'
-  const canRead = (p: Project) => role === 'executive' || (role === 'department_lead' && p.departmentId === viewer.departmentId) || p.participants.includes(viewer.id)
-  const canManage = (p: Project) => ['project_manager', 'department_lead'].includes(role) && p.ownerId === viewer.id
-  const canCreate = ['project_manager', 'department_lead'].includes(role)
-  const canExecute = (t: Task) => { const p = state.projects.find(p => p.id === t.projectId); return !!p && p.status !== 'completed' && (canManage(p) || (role === 'contributor' && t.assigneeId === viewer.id && canRead(p))) }
-  const visibleProjects = state.projects.filter(canRead)
-  const filteredProjects = visibleProjects.filter(p => (!department || p.departmentId === department) && (!projectFilter || !['tasks', 'kanban'].includes(route.page) || p.id === projectFilter) && (!query || ['tasks', 'kanban'].includes(route.page) || `${p.name} ${p.description}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))) && (!priorityFilter || ['tasks', 'kanban'].includes(route.page) || p.priority === priorityFilter) && (!overdueOnly || overdue(p.due, p.status === 'completed')))
-  const projects = filteredProjects.filter(p => !statusFilter || p.status === statusFilter)
-  const visibleTasks = state.tasks.filter(t => filteredProjects.some(p => p.id === t.projectId))
-  const tasks = visibleTasks.filter(t => (!statusFilter || t.status === statusFilter) && (!priorityFilter || t.priority === priorityFilter) && (!query || t.title.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))))
-  const leaves = visibleTasks.filter(t => !visibleTasks.some(child => child.parentId === t.id))
-  const selected = visibleProjects.find(p => p.id === route.id)
-  const selectedTasks = state.tasks.filter(t => t.projectId === selected?.id)
-  const events = state.events.filter(e => e.projectId ? visibleProjects.some(p => p.id === e.projectId) : role === 'administrator')
-  const navigate = (page: Page, id = '') => { window.location.hash = `${page}${id ? `/${id}` : ''}` }
-  const addEvent = (s: State, projectId: string | null, action: string, detail: string): State => ({ ...s, events: [{ id: crypto.randomUUID(), at: new Date().toISOString(), actorId: viewer.id, projectId, action, detail }, ...s.events] })
-  const openModal = (m: Modal) => { setFormError(''); setFormProject(m.projectId || visibleProjects.find(p => canManage(p) && p.status !== 'completed')?.id || ''); setModal(m) }
+  const [state, setState] = useState<State>(loadState);
+  const [role, setRole] = useState<Role>("project_manager");
+  const [route, setRoute] = useState(parseRoute);
+  const [menu, setMenu] = useState(false);
+  const [query, setQuery] = useState("");
+  const [department, setDepartment] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [modal, setModal] = useState<Modal | null>(null);
+  const [toast, setToast] = useState("");
+  const [formError, setFormError] = useState("");
+  const [formProject, setFormProject] = useState("");
+  const [drag, setDrag] = useState<string | null>(null);
+  useEffect(() => {
+    const update = () => {
+      setRoute(parseRoute());
+      setMenu(false);
+      setQuery("");
+      setStatusFilter("");
+      setDepartment("");
+      setProjectFilter("");
+      setPriorityFilter("");
+      setOverdueOnly(false);
+    };
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      setToast(
+        "As alterações funcionam nesta sessão, mas o navegador não permitiu salvar a demonstração.",
+      );
+    }
+  }, [state]);
+  useEffect(() => {
+    if (toast) {
+      const timer = window.setTimeout(() => setToast(""), 6000);
+      return () => window.clearTimeout(timer);
+    }
+  }, [toast]);
+  const viewer =
+    state.people.find((p) => p.role === role && p.active) || state.people[0];
+  const person = (id: string) =>
+    state.people.find((p) => p.id === id)?.name || "Pessoa não encontrada";
+  const dept = (id: string) =>
+    state.departments.find((d) => d.id === id)?.name || "Departamento";
+  const canRead = (p: Project) =>
+    role === "executive" ||
+    (role === "department_lead" && p.departmentId === viewer.departmentId) ||
+    p.participants.includes(viewer.id);
+  const canManage = (p: Project) =>
+    ["project_manager", "department_lead"].includes(role) &&
+    p.ownerId === viewer.id;
+  const canCreate = ["project_manager", "department_lead"].includes(role);
+  const canExecute = (t: Task) => {
+    const p = state.projects.find((p) => p.id === t.projectId);
+    return (
+      !!p &&
+      p.status !== "completed" &&
+      (canManage(p) ||
+        (role === "contributor" && t.assigneeId === viewer.id && canRead(p)))
+    );
+  };
+  const visibleProjects = state.projects.filter(canRead);
+  const filteredProjects = visibleProjects.filter(
+    (p) =>
+      (!department || p.departmentId === department) &&
+      (!projectFilter ||
+        !["tasks", "kanban"].includes(route.page) ||
+        p.id === projectFilter) &&
+      (!query ||
+        ["tasks", "kanban"].includes(route.page) ||
+        `${p.name} ${p.description}`
+          .toLocaleLowerCase("pt-BR")
+          .includes(query.toLocaleLowerCase("pt-BR"))) &&
+      (!priorityFilter ||
+        ["tasks", "kanban"].includes(route.page) ||
+        p.priority === priorityFilter) &&
+      (!overdueOnly || overdue(p.due, p.status === "completed")),
+  );
+  const projects = filteredProjects.filter(
+    (p) => !statusFilter || p.status === statusFilter,
+  );
+  const visibleTasks = state.tasks.filter((t) =>
+    filteredProjects.some((p) => p.id === t.projectId),
+  );
+  const tasks = visibleTasks.filter(
+    (t) =>
+      (!statusFilter || t.status === statusFilter) &&
+      (!priorityFilter || t.priority === priorityFilter) &&
+      (!query ||
+        t.title
+          .toLocaleLowerCase("pt-BR")
+          .includes(query.toLocaleLowerCase("pt-BR"))),
+  );
+  const leaves = visibleTasks.filter(
+    (t) => !visibleTasks.some((child) => child.parentId === t.id),
+  );
+  const selected = visibleProjects.find((p) => p.id === route.id);
+  const selectedTasks = state.tasks.filter((t) => t.projectId === selected?.id);
+  const events = state.events.filter((e) =>
+    e.projectId
+      ? visibleProjects.some((p) => p.id === e.projectId)
+      : role === "administrator",
+  );
+  const navigate = (page: Page, id = "") => {
+    window.location.hash = `${page}${id ? `/${id}` : ""}`;
+  };
+  const addEvent = (
+    s: State,
+    projectId: string | null,
+    action: string,
+    detail: string,
+  ): State => ({
+    ...s,
+    events: [
+      {
+        id: crypto.randomUUID(),
+        at: new Date().toISOString(),
+        actorId: viewer.id,
+        projectId,
+        action,
+        detail,
+      },
+      ...s.events,
+    ],
+  });
+  const openModal = (m: Modal) => {
+    setFormError("");
+    setFormProject(
+      m.projectId ||
+        visibleProjects.find((p) => canManage(p) && p.status !== "completed")
+          ?.id ||
+        "",
+    );
+    setModal(m);
+  };
   function changeStatus(id: string, target: Status) {
-    const t = state.tasks.find(t => t.id === id); if (!t || !canExecute(t)) { setToast('Esta visão não permite alterar essa tarefa.'); return }
-    if (t.status === target) return
-    const children = state.tasks.filter(child => child.parentId === id)
-    if (target === 'done' && children.some(child => child.status !== 'done')) { setToast('Conclua todas as subtarefas antes de concluir a tarefa principal.'); return }
-    let updated = state.tasks.map(item => item.id === id ? { ...item, status: target } : item)
-    let detail = `${t.title}: ${statuses[t.status]} → ${statuses[target]}.`
-    if (t.parentId && target !== 'done') { const parent = state.tasks.find(item => item.id === t.parentId); if (parent?.status === 'done') { updated = updated.map(item => item.id === parent.id ? { ...item, status: 'in_progress' } : item); detail += ` Tarefa principal “${parent.title}” reaberta para Em andamento.` } }
-    setState(addEvent({ ...state, tasks: updated }, t.projectId, 'Status alterado', detail)); setToast('Tarefa atualizada na demonstração.')
+    const t = state.tasks.find((t) => t.id === id);
+    if (!t || !canExecute(t)) {
+      setToast("Esta visão não permite alterar essa tarefa.");
+      return;
+    }
+    if (t.status === target) return;
+    const children = state.tasks.filter((child) => child.parentId === id);
+    if (
+      target === "done" &&
+      children.some((child) => child.status !== "done")
+    ) {
+      setToast(
+        "Conclua todas as subtarefas antes de concluir a tarefa principal.",
+      );
+      return;
+    }
+    let updated = state.tasks.map((item) =>
+      item.id === id ? { ...item, status: target } : item,
+    );
+    let detail = `${t.title}: ${statuses[t.status]} → ${statuses[target]}.`;
+    if (t.parentId && target !== "done") {
+      const parent = state.tasks.find((item) => item.id === t.parentId);
+      if (parent?.status === "done") {
+        updated = updated.map((item) =>
+          item.id === parent.id ? { ...item, status: "in_progress" } : item,
+        );
+        detail += ` Tarefa principal “${parent.title}” reaberta para Em andamento.`;
+      }
+    }
+    setState(
+      addEvent(
+        { ...state, tasks: updated },
+        t.projectId,
+        "Status alterado",
+        detail,
+      ),
+    );
+    setToast("Tarefa atualizada na demonstração.");
   }
   function projectAction(p: Project) {
-    if (!canManage(p)) return
-    if (p.status === 'completed') { setState(addEvent({ ...state, projects: state.projects.map(item => item.id === p.id ? { ...item, status: 'in_progress' } : item) }, p.id, 'Projeto reaberto', `${p.name}: Concluído → Em andamento.`)); setToast('Projeto reaberto na demonstração.'); return }
-    const all = state.tasks.filter(t => t.projectId === p.id)
-    if (!all.length || all.some(t => t.status !== 'done')) { setToast('O projeto precisa ter trabalho e todas as tarefas e subtarefas concluídas.'); return }
-    setState(addEvent({ ...state, projects: state.projects.map(item => item.id === p.id ? { ...item, status: 'completed' } : item) }, p.id, 'Projeto concluído', `${p.name}: ${projectStatuses[p.status]} → Concluído.`)); setToast('Projeto concluído na demonstração.')
+    if (!canManage(p)) return;
+    if (p.status === "completed") {
+      setState(
+        addEvent(
+          {
+            ...state,
+            projects: state.projects.map((item) =>
+              item.id === p.id ? { ...item, status: "in_progress" } : item,
+            ),
+          },
+          p.id,
+          "Projeto reaberto",
+          `${p.name}: Concluído → Em andamento.`,
+        ),
+      );
+      setToast("Projeto reaberto na demonstração.");
+      return;
+    }
+    const all = state.tasks.filter((t) => t.projectId === p.id);
+    if (!all.length || all.some((t) => t.status !== "done")) {
+      setToast(
+        "O projeto precisa ter trabalho e todas as tarefas e subtarefas concluídas.",
+      );
+      return;
+    }
+    setState(
+      addEvent(
+        {
+          ...state,
+          projects: state.projects.map((item) =>
+            item.id === p.id ? { ...item, status: "completed" } : item,
+          ),
+        },
+        p.id,
+        "Projeto concluído",
+        `${p.name}: ${projectStatuses[p.status]} → Concluído.`,
+      ),
+    );
+    setToast("Projeto concluído na demonstração.");
   }
   function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!modal) return
-    const form = new FormData(event.currentTarget); const get = (key: string) => String(form.get(key) || '').trim(); const id = crypto.randomUUID()
-    if (modal.kind === 'project') {
-      const editing = state.projects.find(p => p.id === modal.editId)
-      if ((!editing && !canCreate) || (editing && (!canManage(editing) || editing.status === 'completed'))) { setFormError('Ação indisponível nesta visão.'); return }
-      const item: Project = { id: editing?.id || id, name: get('name'), description: get('description'), departmentId: editing?.departmentId || get('department'), ownerId: editing?.ownerId || viewer.id, participants: editing?.participants || [viewer.id, ...form.getAll('participants').map(String)], priority: get('priority') as Priority, due: get('due'), status: editing?.status || 'planned' }
-      if (!item.name || !item.due || !state.departments.some(d => d.id === item.departmentId && d.active)) { setFormError('Informe nome, departamento ativo e prazo.'); return }
-      const s = { ...state, projects: editing ? state.projects.map(p => p.id === item.id ? item : p) : [item, ...state.projects] }
-      setState(addEvent(s, item.id, editing ? 'Projeto atualizado' : 'Projeto criado', editing ? `${editing.name} → ${item.name}; prazo ${editing.due} → ${item.due}; prioridade ${priorities[editing.priority]} → ${priorities[item.priority]}.` : `${item.name} criado com prazo ${item.due}.`)); navigate('projects', item.id)
-    } else if (modal.kind === 'task') {
-      const p = state.projects.find(p => p.id === get('project'))
-      const parent = state.tasks.find(t => t.id === get('parent'))
-      if (!p || !canManage(p) || p.status === 'completed') { setFormError('Selecione um projeto editável sob sua responsabilidade.'); return }
-      const assignee = state.people.find(u => u.id === get('assignee'))
-      if (!assignee?.active || !p.participants.includes(assignee.id)) { setFormError('O responsável precisa ser participante ativo.'); return }
-      if (parent && (parent.projectId !== p.id || parent.parentId || parent.status === 'done')) { setFormError('Use uma tarefa principal deste projeto que ainda não esteja concluída.'); return }
-      const t: Task = { id, projectId: p.id, parentId: parent?.id || null, title: get('title'), status: 'todo', priority: get('priority') as Priority, due: get('due'), assigneeId: assignee.id }
-      if (!t.title || !t.due) { setFormError('Informe título e prazo.'); return }
-      setState(addEvent({ ...state, tasks: [...state.tasks, t] }, p.id, parent ? 'Subtarefa criada' : 'Tarefa criada', `${t.title}; responsável ${person(t.assigneeId)}; prazo ${t.due}.`))
-    } else if (modal.kind === 'person') {
-      if (role !== 'administrator') return
-      const name = get('name'); if (!name || !get('department')) { setFormError('Informe nome e departamento.'); return }
-      setState(addEvent({ ...state, people: [...state.people, { id, name, departmentId: get('department'), role: get('role') as Role, active: true }] }, null, 'Pessoa demonstrativa criada', `${name} · ${roles[get('role') as Role]}. Não foi criada uma conta de autenticação.`))
+    event.preventDefault();
+    if (!modal) return;
+    const form = new FormData(event.currentTarget);
+    const get = (key: string) => String(form.get(key) || "").trim();
+    const id = crypto.randomUUID();
+    if (modal.kind === "project") {
+      const editing = state.projects.find((p) => p.id === modal.editId);
+      if (
+        (!editing && !canCreate) ||
+        (editing && (!canManage(editing) || editing.status === "completed"))
+      ) {
+        setFormError("Ação indisponível nesta visão.");
+        return;
+      }
+      const item: Project = {
+        id: editing?.id || id,
+        name: get("name"),
+        description: get("description"),
+        departmentId: editing?.departmentId || get("department"),
+        ownerId: editing?.ownerId || viewer.id,
+        participants: editing?.participants || [
+          viewer.id,
+          ...form.getAll("participants").map(String),
+        ],
+        priority: get("priority") as Priority,
+        due: get("due"),
+        status: editing?.status || "planned",
+      };
+      if (
+        !item.name ||
+        !item.due ||
+        !state.departments.some((d) => d.id === item.departmentId && d.active)
+      ) {
+        setFormError("Informe nome, departamento ativo e prazo.");
+        return;
+      }
+      const s = {
+        ...state,
+        projects: editing
+          ? state.projects.map((p) => (p.id === item.id ? item : p))
+          : [item, ...state.projects],
+      };
+      setState(
+        addEvent(
+          s,
+          item.id,
+          editing ? "Projeto atualizado" : "Projeto criado",
+          editing
+            ? `${editing.name} → ${item.name}; prazo ${editing.due} → ${item.due}; prioridade ${priorities[editing.priority]} → ${priorities[item.priority]}.`
+            : `${item.name} criado com prazo ${item.due}.`,
+        ),
+      );
+      navigate("projects", item.id);
+    } else if (modal.kind === "task") {
+      const p = state.projects.find((p) => p.id === get("project"));
+      const parent = state.tasks.find((t) => t.id === get("parent"));
+      if (!p || !canManage(p) || p.status === "completed") {
+        setFormError("Selecione um projeto editável sob sua responsabilidade.");
+        return;
+      }
+      const assignee = state.people.find((u) => u.id === get("assignee"));
+      if (!assignee?.active || !p.participants.includes(assignee.id)) {
+        setFormError("O responsável precisa ser participante ativo.");
+        return;
+      }
+      if (
+        parent &&
+        (parent.projectId !== p.id ||
+          parent.parentId ||
+          parent.status === "done")
+      ) {
+        setFormError(
+          "Use uma tarefa principal deste projeto que ainda não esteja concluída.",
+        );
+        return;
+      }
+      const t: Task = {
+        id,
+        projectId: p.id,
+        parentId: parent?.id || null,
+        title: get("title"),
+        status: "todo",
+        priority: get("priority") as Priority,
+        due: get("due"),
+        assigneeId: assignee.id,
+      };
+      if (!t.title || !t.due) {
+        setFormError("Informe título e prazo.");
+        return;
+      }
+      setState(
+        addEvent(
+          { ...state, tasks: [...state.tasks, t] },
+          p.id,
+          parent ? "Subtarefa criada" : "Tarefa criada",
+          `${t.title}; responsável ${person(t.assigneeId)}; prazo ${t.due}.`,
+        ),
+      );
+    } else if (modal.kind === "person") {
+      if (role !== "administrator") return;
+      const name = get("name");
+      if (!name || !get("department")) {
+        setFormError("Informe nome e departamento.");
+        return;
+      }
+      setState(
+        addEvent(
+          {
+            ...state,
+            people: [
+              ...state.people,
+              {
+                id,
+                name,
+                departmentId: get("department"),
+                role: get("role") as Role,
+                active: true,
+              },
+            ],
+          },
+          null,
+          "Pessoa demonstrativa criada",
+          `${name} · ${roles[get("role") as Role]}. Não foi criada uma conta de autenticação.`,
+        ),
+      );
     } else {
-      if (role !== 'administrator') return
-      const name = get('name'); if (!name || state.departments.some(d => d.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { setFormError('Informe um nome novo de departamento.'); return }
-      setState(addEvent({ ...state, departments: [...state.departments, { id, name, active: true }] }, null, 'Departamento criado', `${name} adicionado à demonstração.`))
+      if (role !== "administrator") return;
+      const name = get("name");
+      if (
+        !name ||
+        state.departments.some(
+          (d) => d.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+        )
+      ) {
+        setFormError("Informe um nome novo de departamento.");
+        return;
+      }
+      setState(
+        addEvent(
+          {
+            ...state,
+            departments: [...state.departments, { id, name, active: true }],
+          },
+          null,
+          "Departamento criado",
+          `${name} adicionado à demonstração.`,
+        ),
+      );
     }
-    setModal(null); setToast('Alteração salva apenas neste navegador. Use somente dados fictícios.')
+    setModal(null);
+    setToast(
+      "Alteração salva apenas neste navegador. Use somente dados fictícios.",
+    );
   }
-  const renderProgress = (p: Project) => { const s = progress(p, state.tasks); return <div className="progress-wrap"><div className="progress-track"><span style={{ width: `${s.value || 0}%` }}/></div><span>{s.value === null ? 'Sem tarefas' : `${s.value.toFixed(1).replace('.', ',')}%`}</span></div> }
-  const taskRow = (t: Task) => <tr key={t.id}><td><span className={t.parentId ? 'subtask-title' : 'task-title'}>{t.parentId && <ChevronRight size={14}/>}<span>{t.title}</span></span></td><td><button className="text-button" onClick={() => navigate('projects', t.projectId)}>{state.projects.find(p => p.id === t.projectId)?.name}</button></td><td><span className="person-inline"><span className="avatar tiny">{initials(person(t.assigneeId))}</span>{person(t.assigneeId)}</span></td><td><Badge color={t.priority}>{priorities[t.priority]}</Badge></td><td className={overdue(t.due, t.status === 'done') ? 'late' : ''}>{formatDate(t.due)}</td><td><select className={`status-select ${t.status}`} aria-label={`Status de ${t.title}`} value={t.status} disabled={!canExecute(t)} onChange={e => changeStatus(t.id, e.target.value as Status)}>{Object.entries(statuses).map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></td></tr>
-  const projectCard = (p: Project) => <article className="project-card" key={p.id}><div className="card-top"><span className="department-label">{dept(p.departmentId)}</span><Badge color={p.priority}>{priorities[p.priority]}</Badge></div><h3><button className="card-title" onClick={() => navigate('projects', p.id)}>{p.name}</button></h3><p>{p.description}</p><div className="card-status"><Badge color={p.status}>{projectStatuses[p.status]}</Badge>{overdue(p.due, p.status === 'completed') && <Badge color="danger">Atrasado</Badge>}</div><div className="progress-label"><span>Progresso por entregas</span><span>{progress(p, state.tasks).done}/{progress(p, state.tasks).total}</span></div>{renderProgress(p)}<footer><span className="avatars">{p.participants.slice(0, 4).map(id => <span key={id} className="avatar tiny" title={person(id)}>{initials(person(id))}</span>)}</span><span><CalendarDays size={14}/>{formatDate(p.due)}</span></footer></article>
-  const heading = selected && route.page === 'projects' ? selected.name : pages.find(p => p.id === route.page)?.name || 'Visão geral'
-  const reset = () => { if (window.confirm('Restaurar apenas os dados fictícios desta demonstração? As alterações locais serão removidas.')) { setState(initialState()); setRole('project_manager'); setDepartment(''); setProjectFilter(''); setQuery(''); setPriorityFilter(''); setStatusFilter(''); setOverdueOnly(false); navigate('dashboard'); setToast('Demonstração restaurada.') } }
-  const editingProject = state.projects.find(p => p.id === modal?.editId)
-  return <div className="app-shell">
-    <aside className={`sidebar ${menu ? 'is-open' : ''}`}><a href="#dashboard" className="brand"><span className="brand-icon"><Leaf size={24}/></span><span>terra<span className="brand-caption">ERP PROJETOS</span></span></a><div className="workspace"><span className="workspace-monogram">T</span><div>Workspace de demonstração<small>Dados 100% fictícios</small></div></div><p className="nav-label">GESTÃO DE PROJETOS</p><nav aria-label="Menu principal">{pages.map(p => <a href={`#${p.id}`} key={p.id} aria-current={route.page === p.id ? 'page' : undefined} className={route.page === p.id ? 'active' : ''}><p.icon size={19}/><span>{p.name}</span>{p.id === 'projects' && <span className="nav-count">{visibleProjects.length}</span>}</a>)}</nav><div className="sidebar-bottom"><div className="demo-note"><span className="demo-dot"/>Modo demonstração<p>Explore com dados fictícios.<br/>Sem autenticação ou backend.</p></div><button className="reset-button" onClick={reset}><RotateCcw size={15}/>Restaurar demonstração</button></div></aside>
-    {menu && <button className="menu-shade" aria-label="Fechar menu" onClick={() => setMenu(false)}/>}
-    <div className="main-shell"><header className="topbar"><div className="breadcrumbs"><button className="icon-button mobile-menu" aria-label="Abrir menu" onClick={() => setMenu(!menu)}><Menu size={22}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{heading}</strong></div><div className="viewer"><label htmlFor="role-select">Visão demonstrativa</label><select id="role-select" value={role} onChange={e => { setRole(e.target.value as Role); setDepartment(''); setProjectFilter(''); setStatusFilter(''); setPriorityFilter(''); setOverdueOnly(false); navigate('dashboard') }}>{Object.entries(roles).map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select><span className="avatar">{initials(viewer.name)}</span></div></header>
-    <main><div className="demo-banner"><span><span className="demo-dot"/>Demonstração interativa</span><span>Alterações ficam neste navegador. Não insira dados reais.</span></div><div className="page-heading"><div><div className="eyebrow">ERP PROJETOS WEB TERRA</div><h1>{route.page === 'dashboard' ? 'Tudo conectado. Projetos em movimento.' : heading}</h1><p>{route.page === 'dashboard' ? 'Uma visão clara do trabalho, das prioridades e das próximas entregas.' : route.page === 'projects' ? selected ? selected.description : 'Planejamento, pessoas e entregas em um só lugar.' : route.page === 'kanban' ? 'Organize a execução e acompanhe o trabalho por status.' : route.page === 'people' ? 'Conheça as pessoas e os departamentos da demonstração.' : route.page === 'history' ? 'Acompanhe as mudanças feitas nesta demonstração.' : 'Cada entrega tem um responsável, uma prioridade e um prazo.'}</p></div><div className="heading-actions">{selected && route.page === 'projects' ? <button className="button secondary" onClick={() => navigate('projects')}><ArrowRight size={16} className="back-arrow"/>Todos os projetos</button> : route.page === 'people' ? role === 'administrator' && <button className="button primary" onClick={() => openModal({ kind: 'person' })}><Plus size={17}/>Nova pessoa demo</button> : route.page !== 'history' && canCreate && <button className="button primary" onClick={() => openModal({ kind: route.page === 'tasks' || route.page === 'kanban' ? 'task' : 'project' })}><Plus size={17}/>{route.page === 'tasks' || route.page === 'kanban' ? 'Nova tarefa' : 'Novo projeto'}</button>}</div></div>
-    {['dashboard', 'projects', 'tasks', 'kanban'].includes(route.page) && !selected && <div className="filter-bar"><div className="search-field"><Search size={17}/><input aria-label="Buscar" placeholder={route.page === 'tasks' || route.page === 'kanban' ? 'Buscar tarefas…' : 'Buscar projetos…'} value={query} onChange={e => setQuery(e.target.value)}/></div><select aria-label="Filtrar departamento" value={department} onChange={e => setDepartment(e.target.value)}><option value="">Todos os departamentos</option>{state.departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>{route.page !== 'dashboard' && <select aria-label="Filtrar status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">Todos os status</option>{Object.entries(route.page === 'projects' ? projectStatuses : statuses).map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select>}<select aria-label="Filtrar prioridade" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}><option value="">Todas as prioridades</option>{Object.entries(priorities).map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select><button className={`filter-toggle ${overdueOnly ? 'on' : ''}`} aria-pressed={overdueOnly} onClick={() => setOverdueOnly(!overdueOnly)}><Clock3 size={15}/>Projetos atrasados</button></div>}
-    {route.page === 'dashboard' && <><div className="metrics"><article className="metric"><div className="metric-icon"><FolderKanban size={20}/></div><span>Total de projetos</span><strong>{filteredProjects.length}<small>no contexto selecionado</small></strong></article><article className="metric"><div className="metric-icon blue"><ArrowRight size={20}/></div><span>Em andamento</span><strong>{filteredProjects.filter(p => p.status === 'in_progress').length}<small>projetos em execução</small></strong></article><article className="metric"><div className="metric-icon amber"><Clock3 size={20}/></div><span>Projetos atrasados</span><strong>{filteredProjects.filter(p => overdue(p.due, p.status === 'completed')).length}<small>prazo do projeto vencido</small></strong></article><article className="metric"><div className="metric-icon green"><CheckCircle2 size={20}/></div><span>Folhas concluídas</span><strong>{leaves.filter(t => t.status === 'done').length}<small>de {leaves.length} entregas, sem duplicação</small></strong></article></div><div className="section-heading"><div><h2>Projetos em destaque</h2><p>Prioridades e progresso das entregas</p></div><button className="text-button" onClick={() => navigate('projects')}>Ver todos os projetos<ArrowRight size={15}/></button></div>{filteredProjects.length ? <div className="project-grid">{[...filteredProjects].sort((a, b) => (a.priority === 'high' ? 0 : 1) - (b.priority === 'high' ? 0 : 1)).slice(0, 3).map(projectCard)}</div> : <Empty title="Nenhum projeto neste contexto" detail="Troque os filtros ou a visão demonstrativa para explorar outros dados fictícios."/>}<div className="dashboard-bottom"><section className="panel"><div className="panel-heading"><div><h2>Próximas entregas</h2><p>Folhas abertas por data de prazo</p></div><Badge>{leaves.filter(t => t.status !== 'done').length} abertas</Badge></div>{[...leaves].filter(t => t.status !== 'done').sort((a, b) => a.due.localeCompare(b.due)).slice(0, 4).map(t => <div className="upcoming" key={t.id}><span className={`task-dot ${t.status}`}/><div><strong>{t.title}</strong><small>{state.projects.find(p => p.id === t.projectId)?.name}</small></div><span className={overdue(t.due, false) ? 'date-pill late' : 'date-pill'}>{formatDate(t.due)}</span></div>)}{!leaves.some(t => t.status !== 'done') && <p className="panel-empty">Nenhuma entrega pendente neste contexto.</p>}</section><section className="panel work-summary"><div className="panel-heading"><div><h2>Situação do trabalho</h2><p>Indicadores calculados por folhas</p></div><ListTodo size={20}/></div>{Object.entries(statuses).map(([id, text]) => <div className="summary-row" key={id}><span><span className={`task-dot ${id}`}/>{text}</span><strong>{leaves.filter(t => t.status === id).length}</strong></div>)}<div className="summary-foot"><Clock3 size={16}/>{leaves.filter(t => overdue(t.due, t.status === 'done')).length} folhas com prazo vencido</div><small>As tarefas principais com subtarefas não são contadas duas vezes.</small></section></div></>}
-    {route.page === 'projects' && !selected && (route.id ? <Empty title="Projeto não disponível" detail="O projeto não está disponível nesta visão demonstrativa."/> : projects.length ? <><div className="results-count">{projects.length} projetos encontrados</div><div className="project-grid all-projects">{projects.map(projectCard)}</div></> : <Empty title="Nenhum projeto encontrado" detail="Ajuste os filtros ou crie um projeto fictício para começar."/>)}
-    {route.page === 'projects' && selected && <><div className="project-detail"><section className="panel detail-meta"><Badge color={selected.status}>{projectStatuses[selected.status]}</Badge><div className="detail-facts"><div><span>Departamento</span><strong>{dept(selected.departmentId)}</strong></div><div><span>Responsável principal</span><strong>{person(selected.ownerId)}</strong></div><div><span>Prazo</span><strong className={overdue(selected.due, selected.status === 'completed') ? 'late' : ''}>{formatDate(selected.due)}</strong></div><div><span>Prioridade</span><strong>{priorities[selected.priority]}</strong></div></div><div className="detail-progress"><span>Progresso: {progress(selected, state.tasks).done} de {progress(selected, state.tasks).total} folhas concluídas</span>{renderProgress(selected)}</div><div className="detail-actions">{canManage(selected) && <><button className="button secondary" onClick={() => projectAction(selected)}>{selected.status === 'completed' ? <RotateCcw size={15}/> : <Check size={15}/>} {selected.status === 'completed' ? 'Reabrir projeto' : 'Concluir projeto'}</button>{selected.status !== 'completed' && <><button className="button secondary" onClick={() => openModal({ kind: 'project', editId: selected.id })}><Settings2 size={15}/>Editar projeto</button><button className="button primary" onClick={() => openModal({ kind: 'task', projectId: selected.id })}><Plus size={16}/>Nova tarefa</button>{selected.status === 'planned' && <button className="button secondary" onClick={() => { setState(addEvent({ ...state, projects: state.projects.map(p => p.id === selected.id ? { ...p, status: 'in_progress' } : p) }, selected.id, 'Projeto iniciado', `${selected.name}: Planejado → Em andamento.`)) }}>Iniciar projeto</button>}</>}</>}</div></section></div><div className="section-heading"><div><h2>Tarefas e subtarefas</h2><p>Conclua as subtarefas antes da tarefa principal.</p></div><Badge>{selectedTasks.length} itens</Badge></div><div className="table-container"><table><thead><tr><th>Entrega</th><th>Projeto</th><th>Responsável</th><th>Prioridade</th><th>Prazo</th><th>Status</th></tr></thead><tbody>{selectedTasks.map(taskRow)}</tbody></table>{!selectedTasks.length && <Empty title="Este projeto ainda não tem tarefas" detail="Um projeto sem trabalho não é considerado concluído."/>}</div><div className="section-heading"><h2>Participantes</h2></div><div className="participant-list">{selected.participants.map(id => <span className="person-inline" key={id}><span className="avatar">{initials(person(id))}</span>{person(id)}</span>)}</div></>}
-    {route.page === 'tasks' && <><div className="results-count">{tasks.length} itens · tarefas e subtarefas</div><div className="table-container"><table><thead><tr><th>Entrega</th><th>Projeto</th><th>Responsável</th><th>Prioridade</th><th>Prazo</th><th>Status</th></tr></thead><tbody>{tasks.map(taskRow)}</tbody></table>{!tasks.length && <Empty title="Nenhuma tarefa encontrada" detail="Ajuste os filtros para ver as entregas disponíveis."/>}</div></>}
-    {route.page === 'kanban' && <><div className="kanban-controls"><span>{tasks.filter(t => !t.parentId).length} tarefas principais · subtarefas dentro dos cards</span><select aria-label="Filtrar projeto do Kanban" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="">Todos os projetos disponíveis</option>{visibleProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div><div className="kanban">{Object.entries(statuses).map(([id, text]) => <section className={`kanban-column ${id}`} key={id} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (drag) changeStatus(drag, id as Status); setDrag(null) }}><div className="column-heading"><span><span className={`task-dot ${id}`}/>{text}<b>{tasks.filter(t => !t.parentId && t.status === id).length}</b></span></div>{tasks.filter(t => !t.parentId && t.status === id).map(t => <article className="kanban-card" key={t.id} draggable={canExecute(t)} onDragStart={() => setDrag(t.id)} onDragEnd={() => setDrag(null)}><div className="card-top"><span className="kanban-project">{state.projects.find(p => p.id === t.projectId)?.name}</span><Badge color={t.priority}>{priorities[t.priority]}</Badge></div><h3>{t.title}</h3>{state.tasks.filter(child => child.parentId === t.id).map(child => <div className="subtask" key={child.id}><span>{child.status === 'done' ? <CheckCircle2 size={14}/> : <Circle size={14}/>} {child.title}</span><select aria-label={`Status de ${child.title}`} value={child.status} disabled={!canExecute(child)} onChange={e => changeStatus(child.id, e.target.value as Status)}>{Object.entries(statuses).map(([sid, txt]) => <option key={sid} value={sid}>{txt}</option>)}</select></div>)}<footer><span className="avatar tiny" title={person(t.assigneeId)}>{initials(person(t.assigneeId))}</span><span className={overdue(t.due, t.status === 'done') ? 'late' : ''}><CalendarDays size={13}/>{formatDate(t.due)}</span></footer><label className="move-label">Mover para<select aria-label={`Mover ${t.title}`} value={t.status} disabled={!canExecute(t)} onChange={e => changeStatus(t.id, e.target.value as Status)}>{Object.entries(statuses).map(([sid, txt]) => <option key={sid} value={sid}>{txt}</option>)}</select></label></article>)}{!tasks.some(t => !t.parentId && t.status === id) && <p className="column-empty">Nenhuma tarefa nesta coluna</p>}</section>)}</div></>}
-    {route.page === 'people' && <><div className="section-heading"><h2>Departamentos</h2>{role === 'administrator' && <button className="button secondary" onClick={() => openModal({ kind: 'department' })}><Plus size={16}/>Novo departamento</button>}</div><div className="departments-grid">{state.departments.map(d => <article className="department-card" key={d.id}><div className="metric-icon"><Users size={20}/></div><h3>{d.name}</h3><p>{state.people.filter(p => p.departmentId === d.id).length} pessoas fictícias · {state.projects.filter(p => p.departmentId === d.id && canRead(p)).length} projetos visíveis</p></article>)}</div><div className="section-heading"><h2>Pessoas fictícias</h2><Badge>Sem contas ou credenciais reais</Badge></div><div className="table-container"><table><thead><tr><th>Pessoa</th><th>Departamento</th><th>Perfil demonstrativo</th><th>Situação</th></tr></thead><tbody>{state.people.map(p => <tr key={p.id}><td><span className="person-inline"><span className="avatar">{initials(p.name)}</span><strong>{p.name}</strong></span></td><td>{dept(p.departmentId)}</td><td>{roles[p.role]}</td><td><Badge color={p.active ? 'done' : ''}>{p.active ? 'Ativa' : 'Inativa'}</Badge></td></tr>)}</tbody></table></div><p className="scope-note">O cadastro nesta demonstração é apenas ilustrativo. No ERP completo, usuários, perfis e acesso serão validados pelo backend.</p></>}
-    {route.page === 'history' && <section className="panel history-panel"><div className="panel-heading"><div><h2>Histórico da demonstração</h2><p>Eventos locais, sem valor de auditoria corporativa.</p></div><Badge>{events.length} eventos</Badge></div>{events.length ? events.map(e => <article className="history-event" key={e.id}><div className="history-icon"><History size={17}/></div><div><strong>{e.action}</strong><p>{e.detail}</p><small>{person(e.actorId)} · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(e.at))}</small></div></article>) : <Empty title="Nenhum evento disponível" detail="Realize uma mudança autorizada na demonstração para explorar o histórico."/>}</section>}
-    <footer className="page-footer"><span>Terra · Gestão de projetos internos</span><span>Protótipo público · dados fictícios · sem backend</span></footer></main></div>
-    {toast && <div role="status" className="toast"><AlertCircle size={18}/><span>{toast}</span><button aria-label="Fechar mensagem" onClick={() => setToast('')}><X size={16}/></button></div>}
-    {modal && <Dialog title={modal.kind === 'project' ? editingProject ? 'Editar projeto fictício' : 'Novo projeto fictício' : modal.kind === 'task' ? 'Nova tarefa ou subtarefa' : modal.kind === 'person' ? 'Nova pessoa fictícia' : 'Novo departamento fictício'} onClose={() => setModal(null)}><form onSubmit={submit}><p className="form-notice">Use somente dados fictícios. As alterações ficam neste navegador.</p>{modal.kind === 'project' ? <><label>Nome do projeto<input name="name" required maxLength={200} defaultValue={editingProject?.name} autoFocus placeholder="Ex.: Melhoria de processos (demo)"/></label><label>Descrição<textarea name="description" maxLength={4000} rows={3} defaultValue={editingProject?.description}/></label><div className="form-grid"><label>Departamento<select name="department" defaultValue={editingProject?.departmentId || viewer.departmentId} disabled={!!editingProject}>{state.departments.filter(d => d.active && (role !== 'department_lead' || d.id === viewer.departmentId)).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><label>Prioridade<select name="priority" defaultValue={editingProject?.priority || 'medium'}>{Object.entries(priorities).map(([id, text]) => <option value={id} key={id}>{text}</option>)}</select></label></div><label>Prazo<input type="date" name="due" required defaultValue={editingProject?.due || dateOffset(14)}/></label>{!editingProject && <fieldset><legend>Participantes fictícios</legend><div className="participant-options">{state.people.filter(p => p.active && p.id !== viewer.id).map(p => <label className="checkbox-label" key={p.id}><input type="checkbox" name="participants" value={p.id}/>{p.name}</label>)}</div></fieldset>}<p className="small-muted">Responsável principal: {editingProject ? person(editingProject.ownerId) : viewer.name}.</p></> : modal.kind === 'task' ? <><label>Projeto<select name="project" required value={formProject} onChange={e => setFormProject(e.target.value)} autoFocus><option value="">Selecione um projeto</option>{visibleProjects.filter(p => canManage(p) && p.status !== 'completed').map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Título<input name="title" required maxLength={200} placeholder="Ex.: Revisar documento fictício"/></label><label>Tipo<select aria-label="Tipo" name="parent" key={`parent-${formProject}`}><option value="">Tarefa principal</option>{state.tasks.filter(t => t.projectId === formProject && !t.parentId && t.status !== 'done').map(t => <option value={t.id} key={t.id}>Subtarefa de: {t.title}</option>)}</select></label><label>Responsável<select aria-label="Responsável" required name="assignee" key={`assignee-${formProject}`}><option value="">Selecione um participante ativo</option>{state.people.filter(p => p.active && state.projects.find(project => project.id === formProject)?.participants.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><div className="form-grid"><label>Prioridade<select name="priority" defaultValue="medium">{Object.entries(priorities).map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></label><label>Prazo<input type="date" name="due" required defaultValue={dateOffset(7)}/></label></div></> : modal.kind === 'person' ? <><label>Nome fictício<input name="name" required maxLength={120} autoFocus/></label><label>Departamento<select name="department">{state.departments.filter(d => d.active).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><label>Perfil demonstrativo<select name="role" defaultValue="contributor">{Object.entries(roles).map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></label></> : <label>Nome fictício do departamento<input name="name" required maxLength={120} autoFocus/></label>}{formError && <p className="form-error" role="alert">{formError}</p>}<div className="form-actions"><button className="button secondary" type="button" onClick={() => setModal(null)}>Cancelar</button><button className="button primary" type="submit"><Check size={16}/>Salvar na demonstração</button></div></form></Dialog>}
-  </div>
+  const renderProgress = (p: Project) => {
+    const s = progress(p, state.tasks);
+    return (
+      <div className="progress-wrap">
+        <div className="progress-track">
+          <span style={{ width: `${s.value || 0}%` }} />
+        </div>
+        <span>
+          {s.value === null
+            ? "Sem tarefas"
+            : `${s.value.toFixed(1).replace(".", ",")}%`}
+        </span>
+      </div>
+    );
+  };
+  const taskRow = (t: Task) => (
+    <tr key={t.id}>
+      <td>
+        <span className={t.parentId ? "subtask-title" : "task-title"}>
+          {t.parentId && <ChevronRight size={14} />}
+          <span>{t.title}</span>
+        </span>
+      </td>
+      <td>
+        <button
+          className="text-button"
+          onClick={() => navigate("projects", t.projectId)}
+        >
+          {state.projects.find((p) => p.id === t.projectId)?.name}
+        </button>
+      </td>
+      <td>
+        <span className="person-inline">
+          <span className="avatar tiny">{initials(person(t.assigneeId))}</span>
+          {person(t.assigneeId)}
+        </span>
+      </td>
+      <td>
+        <Badge color={t.priority}>{priorities[t.priority]}</Badge>
+      </td>
+      <td className={overdue(t.due, t.status === "done") ? "late" : ""}>
+        {formatDate(t.due)}
+      </td>
+      <td>
+        <select
+          className={`status-select ${t.status}`}
+          aria-label={`Status de ${t.title}`}
+          value={t.status}
+          disabled={!canExecute(t)}
+          onChange={(e) => changeStatus(t.id, e.target.value as Status)}
+        >
+          {Object.entries(statuses).map(([id, text]) => (
+            <option key={id} value={id}>
+              {text}
+            </option>
+          ))}
+        </select>
+      </td>
+    </tr>
+  );
+  const projectCard = (p: Project) => (
+    <article className="project-card" key={p.id}>
+      <div className="card-top">
+        <span className="department-label">{dept(p.departmentId)}</span>
+        <Badge color={p.priority}>{priorities[p.priority]}</Badge>
+      </div>
+      <h3>
+        <button
+          className="card-title"
+          onClick={() => navigate("projects", p.id)}
+        >
+          {p.name}
+        </button>
+      </h3>
+      <p>{p.description}</p>
+      <div className="card-status">
+        <Badge color={p.status}>{projectStatuses[p.status]}</Badge>
+        {overdue(p.due, p.status === "completed") && (
+          <Badge color="danger">Atrasado</Badge>
+        )}
+      </div>
+      <div className="progress-label">
+        <span>Progresso por entregas</span>
+        <span>
+          {progress(p, state.tasks).done}/{progress(p, state.tasks).total}
+        </span>
+      </div>
+      {renderProgress(p)}
+      <footer>
+        <span className="avatars">
+          {p.participants.slice(0, 4).map((id) => (
+            <span key={id} className="avatar tiny" title={person(id)}>
+              {initials(person(id))}
+            </span>
+          ))}
+        </span>
+        <span>
+          <CalendarDays size={14} />
+          {formatDate(p.due)}
+        </span>
+      </footer>
+    </article>
+  );
+  const heading =
+    selected && route.page === "projects"
+      ? selected.name
+      : pages.find((p) => p.id === route.page)?.name || "Visão geral";
+  const reset = () => {
+    if (
+      window.confirm(
+        "Restaurar apenas os dados fictícios desta demonstração? As alterações locais serão removidas.",
+      )
+    ) {
+      setState(initialState());
+      setRole("project_manager");
+      setDepartment("");
+      setProjectFilter("");
+      setQuery("");
+      setPriorityFilter("");
+      setStatusFilter("");
+      setOverdueOnly(false);
+      navigate("dashboard");
+      setToast("Demonstração restaurada.");
+    }
+  };
+  const editingProject = state.projects.find((p) => p.id === modal?.editId);
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${menu ? "is-open" : ""}`}>
+        <a href="#dashboard" className="brand">
+          <span className="brand-icon">
+            <Leaf size={24} />
+          </span>
+          <span>
+            terra<span className="brand-caption">ERP PROJETOS</span>
+          </span>
+        </a>
+        <div className="workspace">
+          <span className="workspace-monogram">T</span>
+          <div>
+            Workspace de demonstração<small>Dados 100% fictícios</small>
+          </div>
+        </div>
+        <p className="nav-label">GESTÃO DE PROJETOS</p>
+        <nav aria-label="Menu principal">
+          {pages.map((p) => (
+            <a
+              href={`#${p.id}`}
+              key={p.id}
+              aria-current={route.page === p.id ? "page" : undefined}
+              className={route.page === p.id ? "active" : ""}
+            >
+              <p.icon size={19} />
+              <span>{p.name}</span>
+              {p.id === "projects" && (
+                <span className="nav-count">{visibleProjects.length}</span>
+              )}
+            </a>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="demo-note">
+            <span className="demo-dot" />
+            Modo demonstração
+            <p>
+              Explore com dados fictícios.
+              <br />
+              Sem autenticação ou backend.
+            </p>
+          </div>
+          <button className="reset-button" onClick={reset}>
+            <RotateCcw size={15} />
+            Restaurar demonstração
+          </button>
+        </div>
+      </aside>
+      {menu && (
+        <button
+          className="menu-shade"
+          aria-label="Fechar menu"
+          onClick={() => setMenu(false)}
+        />
+      )}
+      <div className="main-shell">
+        <header className="topbar">
+          <div className="breadcrumbs">
+            <button
+              className="icon-button mobile-menu"
+              aria-label="Abrir menu"
+              onClick={() => setMenu(!menu)}
+            >
+              <Menu size={22} />
+            </button>
+            <span>Workspace</span>
+            <ChevronRight size={14} />
+            <strong>{heading}</strong>
+          </div>
+          <div className="viewer">
+            <label htmlFor="role-select">Visão demonstrativa</label>
+            <select
+              id="role-select"
+              value={role}
+              onChange={(e) => {
+                setRole(e.target.value as Role);
+                setDepartment("");
+                setProjectFilter("");
+                setStatusFilter("");
+                setPriorityFilter("");
+                setOverdueOnly(false);
+                navigate("dashboard");
+              }}
+            >
+              {Object.entries(roles).map(([id, text]) => (
+                <option key={id} value={id}>
+                  {text}
+                </option>
+              ))}
+            </select>
+            <span className="avatar">{initials(viewer.name)}</span>
+          </div>
+        </header>
+        <main>
+          <div className="demo-banner">
+            <span>
+              <span className="demo-dot" />
+              Demonstração interativa
+            </span>
+            <span>
+              Alterações ficam neste navegador. Não insira dados reais.
+            </span>
+          </div>
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">ERP PROJETOS WEB TERRA</div>
+              <h1>
+                {route.page === "dashboard"
+                  ? "Tudo conectado. Projetos em movimento."
+                  : heading}
+              </h1>
+              <p>
+                {route.page === "dashboard"
+                  ? "Uma visão clara do trabalho, das prioridades e das próximas entregas."
+                  : route.page === "projects"
+                    ? selected
+                      ? selected.description
+                      : "Planejamento, pessoas e entregas em um só lugar."
+                    : route.page === "kanban"
+                      ? "Organize a execução e acompanhe o trabalho por status."
+                      : route.page === "people"
+                        ? "Conheça as pessoas e os departamentos da demonstração."
+                        : route.page === "history"
+                          ? "Acompanhe as mudanças feitas nesta demonstração."
+                          : "Cada entrega tem um responsável, uma prioridade e um prazo."}
+              </p>
+            </div>
+            <div className="heading-actions">
+              {selected && route.page === "projects" ? (
+                <button
+                  className="button secondary"
+                  onClick={() => navigate("projects")}
+                >
+                  <ArrowRight size={16} className="back-arrow" />
+                  Todos os projetos
+                </button>
+              ) : route.page === "people" ? (
+                role === "administrator" && (
+                  <button
+                    className="button primary"
+                    onClick={() => openModal({ kind: "person" })}
+                  >
+                    <Plus size={17} />
+                    Nova pessoa demo
+                  </button>
+                )
+              ) : (
+                route.page !== "history" &&
+                canCreate && (
+                  <button
+                    className="button primary"
+                    onClick={() =>
+                      openModal({
+                        kind:
+                          route.page === "tasks" || route.page === "kanban"
+                            ? "task"
+                            : "project",
+                      })
+                    }
+                  >
+                    <Plus size={17} />
+                    {route.page === "tasks" || route.page === "kanban"
+                      ? "Nova tarefa"
+                      : "Novo projeto"}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+          {["dashboard", "projects", "tasks", "kanban"].includes(route.page) &&
+            !selected && (
+              <div className="filter-bar">
+                <div className="search-field">
+                  <Search size={17} />
+                  <input
+                    aria-label="Buscar"
+                    placeholder={
+                      route.page === "tasks" || route.page === "kanban"
+                        ? "Buscar tarefas…"
+                        : "Buscar projetos…"
+                    }
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <select
+                  aria-label="Filtrar departamento"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                >
+                  <option value="">Todos os departamentos</option>
+                  {state.departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                {route.page !== "dashboard" && (
+                  <select
+                    aria-label="Filtrar status"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">Todos os status</option>
+                    {Object.entries(
+                      route.page === "projects" ? projectStatuses : statuses,
+                    ).map(([id, text]) => (
+                      <option key={id} value={id}>
+                        {text}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <select
+                  aria-label="Filtrar prioridade"
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                >
+                  <option value="">Todas as prioridades</option>
+                  {Object.entries(priorities).map(([id, text]) => (
+                    <option key={id} value={id}>
+                      {text}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className={`filter-toggle ${overdueOnly ? "on" : ""}`}
+                  aria-pressed={overdueOnly}
+                  onClick={() => setOverdueOnly(!overdueOnly)}
+                >
+                  <Clock3 size={15} />
+                  Projetos atrasados
+                </button>
+              </div>
+            )}
+          {route.page === "dashboard" && (
+            <>
+              <div className="metrics">
+                <article className="metric">
+                  <div className="metric-icon">
+                    <FolderKanban size={20} />
+                  </div>
+                  <span>Total de projetos</span>
+                  <strong>
+                    {filteredProjects.length}
+                    <small>no contexto selecionado</small>
+                  </strong>
+                </article>
+                <article className="metric">
+                  <div className="metric-icon blue">
+                    <ArrowRight size={20} />
+                  </div>
+                  <span>Em andamento</span>
+                  <strong>
+                    {
+                      filteredProjects.filter((p) => p.status === "in_progress")
+                        .length
+                    }
+                    <small>projetos em execução</small>
+                  </strong>
+                </article>
+                <article className="metric">
+                  <div className="metric-icon amber">
+                    <Clock3 size={20} />
+                  </div>
+                  <span>Projetos atrasados</span>
+                  <strong>
+                    {
+                      filteredProjects.filter((p) =>
+                        overdue(p.due, p.status === "completed"),
+                      ).length
+                    }
+                    <small>prazo do projeto vencido</small>
+                  </strong>
+                </article>
+                <article className="metric">
+                  <div className="metric-icon green">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <span>Folhas concluídas</span>
+                  <strong>
+                    {leaves.filter((t) => t.status === "done").length}
+                    <small>de {leaves.length} entregas, sem duplicação</small>
+                  </strong>
+                </article>
+              </div>
+              <div className="section-heading">
+                <div>
+                  <h2>Projetos em destaque</h2>
+                  <p>Prioridades e progresso das entregas</p>
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() => navigate("projects")}
+                >
+                  Ver todos os projetos
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+              {filteredProjects.length ? (
+                <div className="project-grid">
+                  {[...filteredProjects]
+                    .sort(
+                      (a, b) =>
+                        (a.priority === "high" ? 0 : 1) -
+                        (b.priority === "high" ? 0 : 1),
+                    )
+                    .slice(0, 3)
+                    .map(projectCard)}
+                </div>
+              ) : (
+                <Empty
+                  title="Nenhum projeto neste contexto"
+                  detail="Troque os filtros ou a visão demonstrativa para explorar outros dados fictícios."
+                />
+              )}
+              <div className="dashboard-bottom">
+                <section className="panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Próximas entregas</h2>
+                      <p>Folhas abertas por data de prazo</p>
+                    </div>
+                    <Badge>
+                      {leaves.filter((t) => t.status !== "done").length} abertas
+                    </Badge>
+                  </div>
+                  {[...leaves]
+                    .filter((t) => t.status !== "done")
+                    .sort((a, b) => a.due.localeCompare(b.due))
+                    .slice(0, 4)
+                    .map((t) => (
+                      <div className="upcoming" key={t.id}>
+                        <span className={`task-dot ${t.status}`} />
+                        <div>
+                          <strong>{t.title}</strong>
+                          <small>
+                            {
+                              state.projects.find((p) => p.id === t.projectId)
+                                ?.name
+                            }
+                          </small>
+                        </div>
+                        <span
+                          className={
+                            overdue(t.due, false)
+                              ? "date-pill late"
+                              : "date-pill"
+                          }
+                        >
+                          {formatDate(t.due)}
+                        </span>
+                      </div>
+                    ))}
+                  {!leaves.some((t) => t.status !== "done") && (
+                    <p className="panel-empty">
+                      Nenhuma entrega pendente neste contexto.
+                    </p>
+                  )}
+                </section>
+                <section className="panel work-summary">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Situação do trabalho</h2>
+                      <p>Indicadores calculados por folhas</p>
+                    </div>
+                    <ListTodo size={20} />
+                  </div>
+                  {Object.entries(statuses).map(([id, text]) => (
+                    <div className="summary-row" key={id}>
+                      <span>
+                        <span className={`task-dot ${id}`} />
+                        {text}
+                      </span>
+                      <strong>
+                        {leaves.filter((t) => t.status === id).length}
+                      </strong>
+                    </div>
+                  ))}
+                  <div className="summary-foot">
+                    <Clock3 size={16} />
+                    {
+                      leaves.filter((t) => overdue(t.due, t.status === "done"))
+                        .length
+                    }{" "}
+                    folhas com prazo vencido
+                  </div>
+                  <small>
+                    As tarefas principais com subtarefas não são contadas duas
+                    vezes.
+                  </small>
+                </section>
+              </div>
+            </>
+          )}
+          {route.page === "projects" &&
+            !selected &&
+            (route.id ? (
+              <Empty
+                title="Projeto não disponível"
+                detail="O projeto não está disponível nesta visão demonstrativa."
+              />
+            ) : projects.length ? (
+              <>
+                <div className="results-count">
+                  {projects.length} projetos encontrados
+                </div>
+                <div className="project-grid all-projects">
+                  {projects.map(projectCard)}
+                </div>
+              </>
+            ) : (
+              <Empty
+                title="Nenhum projeto encontrado"
+                detail="Ajuste os filtros ou crie um projeto fictício para começar."
+              />
+            ))}
+          {route.page === "projects" && selected && (
+            <>
+              <div className="project-detail">
+                <section className="panel detail-meta">
+                  <Badge color={selected.status}>
+                    {projectStatuses[selected.status]}
+                  </Badge>
+                  <div className="detail-facts">
+                    <div>
+                      <span>Departamento</span>
+                      <strong>{dept(selected.departmentId)}</strong>
+                    </div>
+                    <div>
+                      <span>Responsável principal</span>
+                      <strong>{person(selected.ownerId)}</strong>
+                    </div>
+                    <div>
+                      <span>Prazo</span>
+                      <strong
+                        className={
+                          overdue(selected.due, selected.status === "completed")
+                            ? "late"
+                            : ""
+                        }
+                      >
+                        {formatDate(selected.due)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Prioridade</span>
+                      <strong>{priorities[selected.priority]}</strong>
+                    </div>
+                  </div>
+                  <div className="detail-progress">
+                    <span>
+                      Progresso: {progress(selected, state.tasks).done} de{" "}
+                      {progress(selected, state.tasks).total} folhas concluídas
+                    </span>
+                    {renderProgress(selected)}
+                  </div>
+                  <div className="detail-actions">
+                    {canManage(selected) && (
+                      <>
+                        <button
+                          className="button secondary"
+                          onClick={() => projectAction(selected)}
+                        >
+                          {selected.status === "completed" ? (
+                            <RotateCcw size={15} />
+                          ) : (
+                            <Check size={15} />
+                          )}{" "}
+                          {selected.status === "completed"
+                            ? "Reabrir projeto"
+                            : "Concluir projeto"}
+                        </button>
+                        {selected.status !== "completed" && (
+                          <>
+                            <button
+                              className="button secondary"
+                              onClick={() =>
+                                openModal({
+                                  kind: "project",
+                                  editId: selected.id,
+                                })
+                              }
+                            >
+                              <Settings2 size={15} />
+                              Editar projeto
+                            </button>
+                            <button
+                              className="button primary"
+                              onClick={() =>
+                                openModal({
+                                  kind: "task",
+                                  projectId: selected.id,
+                                })
+                              }
+                            >
+                              <Plus size={16} />
+                              Nova tarefa
+                            </button>
+                            {selected.status === "planned" && (
+                              <button
+                                className="button secondary"
+                                onClick={() => {
+                                  setState(
+                                    addEvent(
+                                      {
+                                        ...state,
+                                        projects: state.projects.map((p) =>
+                                          p.id === selected.id
+                                            ? { ...p, status: "in_progress" }
+                                            : p,
+                                        ),
+                                      },
+                                      selected.id,
+                                      "Projeto iniciado",
+                                      `${selected.name}: Planejado → Em andamento.`,
+                                    ),
+                                  );
+                                }}
+                              >
+                                Iniciar projeto
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </section>
+              </div>
+              <div className="section-heading">
+                <div>
+                  <h2>Tarefas e subtarefas</h2>
+                  <p>Conclua as subtarefas antes da tarefa principal.</p>
+                </div>
+                <Badge>{selectedTasks.length} itens</Badge>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Entrega</th>
+                      <th>Projeto</th>
+                      <th>Responsável</th>
+                      <th>Prioridade</th>
+                      <th>Prazo</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>{selectedTasks.map(taskRow)}</tbody>
+                </table>
+                {!selectedTasks.length && (
+                  <Empty
+                    title="Este projeto ainda não tem tarefas"
+                    detail="Um projeto sem trabalho não é considerado concluído."
+                  />
+                )}
+              </div>
+              <div className="section-heading">
+                <h2>Participantes</h2>
+              </div>
+              <div className="participant-list">
+                {selected.participants.map((id) => (
+                  <span className="person-inline" key={id}>
+                    <span className="avatar">{initials(person(id))}</span>
+                    {person(id)}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+          {route.page === "tasks" && (
+            <>
+              <div className="results-count">
+                {tasks.length} itens · tarefas e subtarefas
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Entrega</th>
+                      <th>Projeto</th>
+                      <th>Responsável</th>
+                      <th>Prioridade</th>
+                      <th>Prazo</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>{tasks.map(taskRow)}</tbody>
+                </table>
+                {!tasks.length && (
+                  <Empty
+                    title="Nenhuma tarefa encontrada"
+                    detail="Ajuste os filtros para ver as entregas disponíveis."
+                  />
+                )}
+              </div>
+            </>
+          )}
+          {route.page === "kanban" && (
+            <>
+              <div className="kanban-controls">
+                <span>
+                  {tasks.filter((t) => !t.parentId).length} tarefas principais ·
+                  subtarefas dentro dos cards
+                </span>
+                <select
+                  aria-label="Filtrar projeto do Kanban"
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                >
+                  <option value="">Todos os projetos disponíveis</option>
+                  {visibleProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="kanban">
+                {Object.entries(statuses).map(([id, text]) => (
+                  <section
+                    className={`kanban-column ${id}`}
+                    key={id}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (drag) changeStatus(drag, id as Status);
+                      setDrag(null);
+                    }}
+                  >
+                    <div className="column-heading">
+                      <span>
+                        <span className={`task-dot ${id}`} />
+                        {text}
+                        <b>
+                          {
+                            tasks.filter((t) => !t.parentId && t.status === id)
+                              .length
+                          }
+                        </b>
+                      </span>
+                    </div>
+                    {tasks
+                      .filter((t) => !t.parentId && t.status === id)
+                      .map((t) => (
+                        <article
+                          className="kanban-card"
+                          key={t.id}
+                          draggable={canExecute(t)}
+                          onDragStart={() => setDrag(t.id)}
+                          onDragEnd={() => setDrag(null)}
+                        >
+                          <div className="card-top">
+                            <span className="kanban-project">
+                              {
+                                state.projects.find((p) => p.id === t.projectId)
+                                  ?.name
+                              }
+                            </span>
+                            <Badge color={t.priority}>
+                              {priorities[t.priority]}
+                            </Badge>
+                          </div>
+                          <h3>{t.title}</h3>
+                          {state.tasks
+                            .filter((child) => child.parentId === t.id)
+                            .map((child) => (
+                              <div className="subtask" key={child.id}>
+                                <span>
+                                  {child.status === "done" ? (
+                                    <CheckCircle2 size={14} />
+                                  ) : (
+                                    <Circle size={14} />
+                                  )}{" "}
+                                  {child.title}
+                                </span>
+                                <select
+                                  aria-label={`Status de ${child.title}`}
+                                  value={child.status}
+                                  disabled={!canExecute(child)}
+                                  onChange={(e) =>
+                                    changeStatus(
+                                      child.id,
+                                      e.target.value as Status,
+                                    )
+                                  }
+                                >
+                                  {Object.entries(statuses).map(
+                                    ([sid, txt]) => (
+                                      <option key={sid} value={sid}>
+                                        {txt}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </div>
+                            ))}
+                          <footer>
+                            <span
+                              className="avatar tiny"
+                              title={person(t.assigneeId)}
+                            >
+                              {initials(person(t.assigneeId))}
+                            </span>
+                            <span
+                              className={
+                                overdue(t.due, t.status === "done")
+                                  ? "late"
+                                  : ""
+                              }
+                            >
+                              <CalendarDays size={13} />
+                              {formatDate(t.due)}
+                            </span>
+                          </footer>
+                          <label className="move-label">
+                            Mover para
+                            <select
+                              aria-label={`Mover ${t.title}`}
+                              value={t.status}
+                              disabled={!canExecute(t)}
+                              onChange={(e) =>
+                                changeStatus(t.id, e.target.value as Status)
+                              }
+                            >
+                              {Object.entries(statuses).map(([sid, txt]) => (
+                                <option key={sid} value={sid}>
+                                  {txt}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </article>
+                      ))}
+                    {!tasks.some((t) => !t.parentId && t.status === id) && (
+                      <p className="column-empty">
+                        Nenhuma tarefa nesta coluna
+                      </p>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </>
+          )}
+          {route.page === "people" && (
+            <>
+              <div className="section-heading">
+                <h2>Departamentos</h2>
+                {role === "administrator" && (
+                  <button
+                    className="button secondary"
+                    onClick={() => openModal({ kind: "department" })}
+                  >
+                    <Plus size={16} />
+                    Novo departamento
+                  </button>
+                )}
+              </div>
+              <div className="departments-grid">
+                {state.departments.map((d) => (
+                  <article className="department-card" key={d.id}>
+                    <div className="metric-icon">
+                      <Users size={20} />
+                    </div>
+                    <h3>{d.name}</h3>
+                    <p>
+                      {
+                        state.people.filter((p) => p.departmentId === d.id)
+                          .length
+                      }{" "}
+                      pessoas fictícias ·{" "}
+                      {
+                        state.projects.filter(
+                          (p) => p.departmentId === d.id && canRead(p),
+                        ).length
+                      }{" "}
+                      projetos visíveis
+                    </p>
+                  </article>
+                ))}
+              </div>
+              <div className="section-heading">
+                <h2>Pessoas fictícias</h2>
+                <Badge>Sem contas ou credenciais reais</Badge>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>Departamento</th>
+                      <th>Perfil demonstrativo</th>
+                      <th>Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.people.map((p) => (
+                      <tr key={p.id}>
+                        <td>
+                          <span className="person-inline">
+                            <span className="avatar">{initials(p.name)}</span>
+                            <strong>{p.name}</strong>
+                          </span>
+                        </td>
+                        <td>{dept(p.departmentId)}</td>
+                        <td>{roles[p.role]}</td>
+                        <td>
+                          <Badge color={p.active ? "done" : ""}>
+                            {p.active ? "Ativa" : "Inativa"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="scope-note">
+                O cadastro nesta demonstração é apenas ilustrativo. No ERP
+                completo, usuários, perfis e acesso serão validados pelo
+                backend.
+              </p>
+            </>
+          )}
+          {route.page === "history" && (
+            <section className="panel history-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>Histórico da demonstração</h2>
+                  <p>Eventos locais, sem valor de auditoria corporativa.</p>
+                </div>
+                <Badge>{events.length} eventos</Badge>
+              </div>
+              {events.length ? (
+                events.map((e) => (
+                  <article className="history-event" key={e.id}>
+                    <div className="history-icon">
+                      <History size={17} />
+                    </div>
+                    <div>
+                      <strong>{e.action}</strong>
+                      <p>{e.detail}</p>
+                      <small>
+                        {person(e.actorId)} ·{" "}
+                        {new Intl.DateTimeFormat("pt-BR", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        }).format(new Date(e.at))}
+                      </small>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <Empty
+                  title="Nenhum evento disponível"
+                  detail="Realize uma mudança autorizada na demonstração para explorar o histórico."
+                />
+              )}
+            </section>
+          )}
+          <footer className="page-footer">
+            <span>Terra · Gestão de projetos internos</span>
+            <span>Protótipo público · dados fictícios · sem backend</span>
+          </footer>
+        </main>
+      </div>
+      {toast && (
+        <div role="status" className="toast">
+          <AlertCircle size={18} />
+          <span>{toast}</span>
+          <button aria-label="Fechar mensagem" onClick={() => setToast("")}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {modal && (
+        <Dialog
+          title={
+            modal.kind === "project"
+              ? editingProject
+                ? "Editar projeto fictício"
+                : "Novo projeto fictício"
+              : modal.kind === "task"
+                ? "Nova tarefa ou subtarefa"
+                : modal.kind === "person"
+                  ? "Nova pessoa fictícia"
+                  : "Novo departamento fictício"
+          }
+          onClose={() => setModal(null)}
+        >
+          <form onSubmit={submit}>
+            <p className="form-notice">
+              Use somente dados fictícios. As alterações ficam neste navegador.
+            </p>
+            {modal.kind === "project" ? (
+              <>
+                <label>
+                  Nome do projeto
+                  <input
+                    name="name"
+                    required
+                    maxLength={200}
+                    defaultValue={editingProject?.name}
+                    autoFocus
+                    placeholder="Ex.: Melhoria de processos (demo)"
+                  />
+                </label>
+                <label>
+                  Descrição
+                  <textarea
+                    name="description"
+                    maxLength={4000}
+                    rows={3}
+                    defaultValue={editingProject?.description}
+                  />
+                </label>
+                <div className="form-grid">
+                  <label>
+                    Departamento
+                    <select
+                      name="department"
+                      defaultValue={
+                        editingProject?.departmentId || viewer.departmentId
+                      }
+                      disabled={!!editingProject}
+                    >
+                      {state.departments
+                        .filter(
+                          (d) =>
+                            d.active &&
+                            (role !== "department_lead" ||
+                              d.id === viewer.departmentId),
+                        )
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Prioridade
+                    <select
+                      name="priority"
+                      defaultValue={editingProject?.priority || "medium"}
+                    >
+                      {Object.entries(priorities).map(([id, text]) => (
+                        <option value={id} key={id}>
+                          {text}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Prazo
+                  <input
+                    type="date"
+                    name="due"
+                    required
+                    defaultValue={editingProject?.due || dateOffset(14)}
+                  />
+                </label>
+                {!editingProject && (
+                  <fieldset>
+                    <legend>Participantes fictícios</legend>
+                    <div className="participant-options">
+                      {state.people
+                        .filter((p) => p.active && p.id !== viewer.id)
+                        .map((p) => (
+                          <label className="checkbox-label" key={p.id}>
+                            <input
+                              type="checkbox"
+                              name="participants"
+                              value={p.id}
+                            />
+                            {p.name}
+                          </label>
+                        ))}
+                    </div>
+                  </fieldset>
+                )}
+                <p className="small-muted">
+                  Responsável principal:{" "}
+                  {editingProject
+                    ? person(editingProject.ownerId)
+                    : viewer.name}
+                  .
+                </p>
+              </>
+            ) : modal.kind === "task" ? (
+              <>
+                <label>
+                  Projeto
+                  <select
+                    name="project"
+                    required
+                    value={formProject}
+                    onChange={(e) => setFormProject(e.target.value)}
+                    autoFocus
+                  >
+                    <option value="">Selecione um projeto</option>
+                    {visibleProjects
+                      .filter((p) => canManage(p) && p.status !== "completed")
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Título
+                  <input
+                    name="title"
+                    required
+                    maxLength={200}
+                    placeholder="Ex.: Revisar documento fictício"
+                  />
+                </label>
+                <label>
+                  Tipo
+                  <select
+                    aria-label="Tipo"
+                    name="parent"
+                    key={`parent-${formProject}`}
+                  >
+                    <option value="">Tarefa principal</option>
+                    {state.tasks
+                      .filter(
+                        (t) =>
+                          t.projectId === formProject &&
+                          !t.parentId &&
+                          t.status !== "done",
+                      )
+                      .map((t) => (
+                        <option value={t.id} key={t.id}>
+                          Subtarefa de: {t.title}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Responsável
+                  <select
+                    aria-label="Responsável"
+                    required
+                    name="assignee"
+                    key={`assignee-${formProject}`}
+                  >
+                    <option value="">Selecione um participante ativo</option>
+                    {state.people
+                      .filter(
+                        (p) =>
+                          p.active &&
+                          state.projects
+                            .find((project) => project.id === formProject)
+                            ?.participants.includes(p.id),
+                      )
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <div className="form-grid">
+                  <label>
+                    Prioridade
+                    <select name="priority" defaultValue="medium">
+                      {Object.entries(priorities).map(([id, text]) => (
+                        <option key={id} value={id}>
+                          {text}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Prazo
+                    <input
+                      type="date"
+                      name="due"
+                      required
+                      defaultValue={dateOffset(7)}
+                    />
+                  </label>
+                </div>
+              </>
+            ) : modal.kind === "person" ? (
+              <>
+                <label>
+                  Nome fictício
+                  <input name="name" required maxLength={120} autoFocus />
+                </label>
+                <label>
+                  Departamento
+                  <select name="department">
+                    {state.departments
+                      .filter((d) => d.active)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Perfil demonstrativo
+                  <select name="role" defaultValue="contributor">
+                    {Object.entries(roles).map(([id, text]) => (
+                      <option key={id} value={id}>
+                        {text}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <label>
+                Nome fictício do departamento
+                <input name="name" required maxLength={120} autoFocus />
+              </label>
+            )}
+            {formError && (
+              <p className="form-error" role="alert">
+                {formError}
+              </p>
+            )}
+            <div className="form-actions">
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => setModal(null)}
+              >
+                Cancelar
+              </button>
+              <button className="button primary" type="submit">
+                <Check size={16} />
+                Salvar na demonstração
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+    </div>
+  );
 }
